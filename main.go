@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"github.com/c-bata/go-prompt"
-	"os"
 	"os/exec"
 	"strings"
 )
@@ -12,7 +11,11 @@ type service struct {
 	name        string
 	description string
 	state       string
+	load        string
+	sub         string
 }
+
+var SERVICE string
 
 func serviceCompleter(d prompt.Document) []prompt.Suggest {
 	services := getAllServices()
@@ -28,21 +31,38 @@ func serviceCompleter(d prompt.Document) []prompt.Suggest {
 }
 
 func getAllServices() []service {
-	s1 := service{
-		name:        "NetworkManager",
-		description: "Network Manager",
-		state:       "active",
-	}
-	s2 := service{
-		name:        "rsyslog",
-		description: "System Logging Service",
-		state:       "active",
+	var services []service
+
+	cmd := exec.Command("systemctl", "list-units", "--plain")
+	out, err := cmd.Output()
+	if err != nil {
+		fmt.Printf("Failed to get services from `systemctl list-units`: %s\n", err)
+		return nil
 	}
 
-	services := []service{
-		s1,
-		s2,
+	for _, line := range strings.Split(strings.TrimSuffix(string(out), "\n"), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 5 {
+			fmt.Printf("Error, too few fields in line: %s\n", line)
+			continue
+		}
+		unit := fields[0]
+		load := fields[1]
+		active := fields[2]
+		sub := fields[3]
+		description := strings.Join(fields[4:], " ")
+
+		var s = service{
+			name:        unit,
+			load:        load,
+			state:       active,
+			sub:         sub,
+			description: description,
+		}
+
+		services = append(services, s)
 	}
+
 	return services
 }
 
@@ -70,8 +90,6 @@ func actionCompleter(d prompt.Document) []prompt.Suggest {
 	}
 	return prompt.FilterHasPrefix(s, d.GetWordBeforeCursor(), true)
 }
-
-var SERVICE string
 
 func main() {
 	fmt.Println("Welcome to systemd-repl. Quit with Ctrl+D")
