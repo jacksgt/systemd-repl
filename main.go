@@ -26,15 +26,15 @@ var DBUSCONN *dbus.Conn
 
 func serviceCompleter(d prompt.Document) []prompt.Suggest {
 	units := getAllUnits()
-	var u []prompt.Suggest
-	for _, e := range units {
-		u = append(u, prompt.Suggest{
-			Text:        e.Name,
-			Description: fmt.Sprintf("%s [%s]", e.Description, e.SubState),
+	var s []prompt.Suggest
+	for _, u := range units {
+		s = append(s, prompt.Suggest{
+			Text:        u.Name,
+			Description: fmt.Sprintf("%s [%s]", u.Description, u.SubState),
 		})
 	}
 
-	return prompt.FilterHasPrefix(u, d.GetWordBeforeCursor(), true)
+	return prompt.FilterHasPrefix(s, d.GetWordBeforeCursor(), true)
 }
 
 func connectToDbus() error {
