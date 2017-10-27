@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/c-bata/go-prompt"
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/c-bata/go-prompt"
+	"github.com/coreos/go-systemd/dbus"
 )
 
 type service struct {
@@ -18,53 +20,40 @@ type service struct {
 
 var SERVICE string
 
+var UNIT string
+
+var DBUSCONN *dbus.Conn
+
 func serviceCompleter(d prompt.Document) []prompt.Suggest {
-	services := getAllServices()
-	var s []prompt.Suggest
-	for _, e := range services[1:] {
-		s = append(s, prompt.Suggest{
-			Text:        e.name,
-			Description: fmt.Sprintf("%s [%s]", e.description, e.state),
+	units := getAllUnits()
+	var u []prompt.Suggest
+	for _, e := range units {
+		u = append(u, prompt.Suggest{
+			Text:        e.Name,
+			Description: fmt.Sprintf("%s [%s]", e.Description, e.SubState),
 		})
 	}
 
-	return prompt.FilterHasPrefix(s, d.GetWordBeforeCursor(), true)
+	return prompt.FilterHasPrefix(u, d.GetWordBeforeCursor(), true)
 }
 
-func getAllServices() []service {
-	var services []service
-
-	cmd := exec.Command("systemctl", "list-units", "--plain")
-	out, err := cmd.Output()
+func connectToDbus() error {
+	conn, err := dbus.NewSystemConnection()
 	if err != nil {
-		fmt.Printf("Failed to get services from `systemctl list-units`: %s\n", err)
+		return err
+	}
+
+	DBUSCONN = conn
+	return nil
+}
+
+func getAllUnits() []dbus.UnitStatus {
+	u, err := DBUSCONN.ListUnits()
+	if err != nil {
+		fmt.Errorf("Error getting all units fro dbus: %s\n", err)
 		return nil
 	}
-
-	for _, line := range strings.Split(strings.TrimSuffix(string(out), "\n"), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) < 5 {
-			fmt.Printf("Error, too few fields in line: %s\n", line)
-			continue
-		}
-		unit := fields[0]
-		load := fields[1]
-		active := fields[2]
-		sub := fields[3]
-		description := strings.Join(fields[4:], " ")
-
-		var s = service{
-			name:        unit,
-			load:        load,
-			state:       active,
-			sub:         sub,
-			description: description,
-		}
-
-		services = append(services, s)
-	}
-
-	return services
+	return u
 }
 
 func executor(s string) {
@@ -74,16 +63,16 @@ func executor(s string) {
 	}
 
 	if s == "logs" {
-		fmt.Print(journalctl(SERVICE))
+		fmt.Print(journalctl(UNIT))
 		return
 	}
 
 	if s == "followlogs" {
-		followlogs(SERVICE)
+		followlogs(UNIT)
 		return
 	}
 
-	fmt.Print(systemctlRun(SERVICE, s))
+	fmt.Print(systemctlRun(UNIT, s))
 	return
 }
 
@@ -98,17 +87,48 @@ func actionCompleter(d prompt.Document) []prompt.Suggest {
 	return prompt.FilterHasPrefix(s, d.GetWordBeforeCursor(), true)
 }
 
+func listUnits() {
+	units := getAllUnits()
+	for _, u := range units {
+		fmt.Printf("%s [%s] %s\n", u.Name, u.SubState, u.Description)
+	}
+	return
+}
+
+func unitAvailable(name string) bool {
+	return true
+}
+
 func main() {
-	fmt.Println("Welcome to systemd-repl. Quit with Ctrl+D")
+	err := connectToDbus()
+	if err != nil {
+		fmt.Printf("Failed to connect to systemd: %s\n", err)
+		os.Exit(1)
+	}
+	defer DBUSCONN.Close()
+
+	fmt.Println("Welcome to systemd-repl. Connected to systemd. Quit with Ctrl+D")
 
 	fmt.Println("Select service")
-	SERVICE = prompt.Input("> ", serviceCompleter)
-	fmt.Println("Selected " + SERVICE)
+
+	var in string
+	for UNIT == "" {
+		in = prompt.Input("> ", serviceCompleter)
+		if in == "list-units" {
+			listUnits()
+		} else if unitAvailable(in) {
+			UNIT = in
+		} else {
+			fmt.Printf("Unit '%s' unavailable\n", in)
+		}
+	}
+
+	fmt.Println("Selected " + UNIT)
 
 	p := prompt.New(
 		executor,
 		actionCompleter,
-		prompt.OptionPrefix(SERVICE+"> "),
+		prompt.OptionPrefix(UNIT+"> "),
 		prompt.OptionTitle("systemd REPL"),
 	)
 	p.Run()
