@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/c-bata/go-prompt"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -20,7 +21,7 @@ var SERVICE string
 func serviceCompleter(d prompt.Document) []prompt.Suggest {
 	services := getAllServices()
 	var s []prompt.Suggest
-	for _, e := range services {
+	for _, e := range services[1:] {
 		s = append(s, prompt.Suggest{
 			Text:        e.name,
 			Description: fmt.Sprintf("%s [%s]", e.description, e.state),
@@ -77,6 +78,11 @@ func executor(s string) {
 		return
 	}
 
+	if s == "followlogs" {
+		followlogs(SERVICE)
+		return
+	}
+
 	fmt.Print(systemctlRun(SERVICE, s))
 	return
 }
@@ -87,6 +93,7 @@ func actionCompleter(d prompt.Document) []prompt.Suggest {
 		{Text: "start", Description: "Launch service"},
 		{Text: "stop", Description: "Terminate service"},
 		{Text: "logs", Description: "Show service logs"},
+		{Text: "followlogs", Description: "Follow service logs"},
 	}
 	return prompt.FilterHasPrefix(s, d.GetWordBeforeCursor(), true)
 }
@@ -124,4 +131,14 @@ func journalctl(service string) string {
 		return fmt.Sprintf("%s", err)
 	}
 	return string(out)
+}
+
+func followlogs(service string) {
+	cmd := exec.Command("journalctl", "-fu", service)
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+	cmd.Stdin = os.Stdin
+	cmd.Start()
+	cmd.Wait()
+	return
 }
