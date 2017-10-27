@@ -8,6 +8,18 @@
   version = "v0.1.1"
 
 [[projects]]
+  name = "github.com/coreos/go-systemd"
+  packages = ["dbus"]
+  revision = "d2196463941895ee908e13531a23a39feb9e1243"
+  version = "v15"
+
+[[projects]]
+  name = "github.com/godbus/dbus"
+  packages = ["."]
+  revision = "5f6efc7ef2759c81b7ba876593971bfce311eab3"
+  version = "v4.0.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/pkg/term"
   packages = ["termios"]
@@ -22,6 +34,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "faf68b6927ceebd339abf38f9ee108ee95539250f9e33cdef7bfa2cafe86d338"
+  inputs-digest = "5580cfda64210d2118e2578e9d38d9b8dcd1d8d3ff032df4b7854366e994d74c"
   solver-name = "gps-cdcl"
   solver-version = 1
