@@ -108,7 +108,7 @@ func main() {
 	p := prompt.New(
 		executor,
 		actionCompleter,
-		prompt.OptionPrefix("> "),
+		prompt.OptionPrefix(SERVICE+"> "),
 		prompt.OptionTitle("systemd REPL"),
 	)
 	p.Run()
